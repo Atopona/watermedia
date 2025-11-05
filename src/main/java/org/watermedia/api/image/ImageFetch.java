@@ -105,7 +105,36 @@ public class ImageFetch implements Runnable {
                         if (!type.startsWith("image"))
                             throw new NoImageException();
                     } else {
-                        throw new NoImageException();
+                        // Fallback: check file extension when MIME type is not available (e.g., local files)
+                        String path = patchUri.getPath();
+                        if (path != null) {
+                            String lowerPath = path.toLowerCase();
+                            // Check for video file extensions
+                            if (lowerPath.endsWith(".mkv") || lowerPath.endsWith(".mp4") || 
+                                lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov") || 
+                                lowerPath.endsWith(".webm") || lowerPath.endsWith(".flv") ||
+                                lowerPath.endsWith(".wmv") || lowerPath.endsWith(".m4v") ||
+                                lowerPath.endsWith(".mpg") || lowerPath.endsWith(".mpeg") ||
+                                lowerPath.endsWith(".m3u8") || lowerPath.endsWith(".m3u") ||
+                                lowerPath.endsWith(".ts") || lowerPath.endsWith(".m2ts")) {
+                                throw new VideoTypeException();
+                            }
+                            // Check for audio file extensions
+                            if (lowerPath.endsWith(".mp3") || lowerPath.endsWith(".wav") || 
+                                lowerPath.endsWith(".ogg") || lowerPath.endsWith(".flac") ||
+                                lowerPath.endsWith(".aac") || lowerPath.endsWith(".m4a") ||
+                                lowerPath.endsWith(".wma") || lowerPath.endsWith(".opus")) {
+                                throw new VideoTypeException();
+                            }
+                            // If not a known image extension, throw exception
+                            if (!lowerPath.endsWith(".png") && !lowerPath.endsWith(".jpg") && 
+                                !lowerPath.endsWith(".jpeg") && !lowerPath.endsWith(".gif") && 
+                                !lowerPath.endsWith(".bmp") && !lowerPath.endsWith(".webp")) {
+                                throw new NoImageException();
+                            }
+                        } else {
+                            throw new NoImageException();
+                        }
                     }
 
                     // NOT MODIFIED SERVER

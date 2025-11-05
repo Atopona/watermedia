@@ -88,3 +88,49 @@ generously provided and donated by [Caprica Software Limited](https://www.capric
 
 ## LibVLC license
 LibVLC Windows 10 (x64) binaries are wrapped under [LGPLv2.1](https://code.videolan.org/videolan/vlc/-/blob/master/COPYING)
+
+# 🔨 Building from Source
+
+## Prerequisites
+- JDK 21 or higher
+- Git
+
+## Build Commands
+
+### Clone the repository
+```bash
+git clone https://github.com/WaterMediaTeam/watermedia.git
+cd watermedia
+```
+
+### Build the project
+```bash
+./gradlew build
+```
+
+### Build without tests (faster)
+```bash
+./gradlew build -x test
+```
+
+### Build Shadow JAR (with all dependencies)
+```bash
+./gradlew shadowJar
+```
+
+### Build all artifacts
+```bash
+./gradlew build shadowJar sourcesJar
+```
+
+## Build Artifacts
+After building, you can find the JAR files in:
+- `build/libs/` - Main JAR and sources JAR
+- `builtJars/` - Shadow JAR (configured output directory)
+
+## CI/CD
+This project uses GitHub Actions for continuous integration:
+- **Build CI**: Runs on every push and pull request
+- **Release**: Runs on tag push, generates artifacts
+
+See [.github/workflows/README.md](.github/workflows/README.md) for more details.

@@ -1,8 +1,14 @@
 # 📦 UPDATE 2.1.37 (Upcoming)
 - ✨ Enhanced MKV (Matroska) format support
   - Added explicit `video/x-matroska` MIME type recognition
+  - Added file extension fallback detection for local files
+  - Fixed ImageFetch incorrectly treating video files as images
   - Added comprehensive MKV support documentation
   - Added MKV playback examples and test cases
+- 🛠️ Updated GitHub Actions workflows
+  - Updated actions to v4 (checkout, setup-java, upload-artifact)
+  - Removed CurseForge and Modrinth auto-publishing
+  - Added artifact upload to GitHub Actions
 - 📝 Updated README with supported video formats section
 
 # 📦 UPDATE 2.1.36
