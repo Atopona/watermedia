@@ -12,11 +12,15 @@ org.watermedia.api.image.ImageFetch$NoImageException: null
 当尝试加载本地 MKV 文件时，`ImageFetch` 会错误地尝试将其作为图像处理，导致抛出 `NoImageException`。
 
 ### 根本原因
-在 `ImageFetch.java` 中，代码依赖 `URLConnection.getContentType()` 来判断文件类型。但是对于本地文件（`file://` 协议），这个方法经常返回 `null`，导致：
+问题出现在两个地方：
 
-1. 无法通过 MIME 类型识别视频文件
-2. 直接抛出 `NoImageException`
-3. 没有检查文件扩展名作为后备方案
+1. **NetworkAPI.patch()** - 对于本地文件（`file://` 协议），没有匹配的 URL patcher，返回 `assumeVideo=false`
+2. **ImageFetch.java** - 代码依赖 `URLConnection.getContentType()` 来判断文件类型，但对于本地文件这个方法经常返回 `null`
+
+导致：
+1. `NetworkAPI.patch()` 没有识别本地视频文件
+2. `ImageFetch` 尝试将视频文件作为图像处理
+3. 抛出 `NoImageException`
 
 ### 代码问题位置
 ```java
@@ -36,9 +40,49 @@ if (type != null) {
 ## ✅ 解决方案
 
 ### 修复策略
-添加文件扩展名检查作为 MIME 类型检测的后备方案。
+在两个地方添加文件扩展名检查：
+1. **NetworkAPI.patch()** - 在返回结果前检查文件扩展名，设置正确的 `assumeVideo` 值
+2. **ImageFetch.java** - 添加文件扩展名检查作为 MIME 类型检测的后备方案（双重保险）
 
 ### 修复后的代码
+
+#### 1. NetworkAPI.patch() 修复
+```java
+public static AbstractPatch.Result patch(URI uri) {
+    try {
+        for (AbstractPatch fixer: FIXERS) {
+            if (fixer.isValid(uri)) {
+                AbstractPatch.Result r = CACHE.get(uri);
+                if (r != null) return r;
+
+                r = fixer.patch(uri, null);
+                CACHE.put(uri, r);
+                return r;
+            }
+        }
+        
+        // ✅ 新增：检查文件扩展名
+        boolean assumeVideo = isVideoOrAudioFile(uri);
+        return new AbstractPatch.Result(uri, assumeVideo, false);
+    } catch (Exception e) {
+        LOGGER.error(IT, "Exception occurred fixing URL", e);
+        return null;
+    }
+}
+
+private static boolean isVideoOrAudioFile(URI uri) {
+    String path = uri.getPath();
+    if (path == null) return false;
+    
+    String lowerPath = path.toLowerCase();
+    
+    // Check for video/audio extensions
+    return lowerPath.endsWith(".mkv") || lowerPath.endsWith(".mp4") || 
+           lowerPath.endsWith(".avi") || /* ... more extensions ... */;
+}
+```
+
+#### 2. ImageFetch.java 修复（后备方案）
 ```java
 String type = conn.getContentType();
 if (type != null) {

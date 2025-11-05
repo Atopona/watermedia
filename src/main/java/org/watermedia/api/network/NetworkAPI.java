@@ -86,11 +86,58 @@ public class NetworkAPI extends WaterMediaAPI {
                     return r;
                 }
             }
-            return new AbstractPatch.Result(uri, false, false);
+            
+            // No patcher matched, check if it's a video/audio file by extension
+            boolean assumeVideo = isVideoOrAudioFile(uri);
+            return new AbstractPatch.Result(uri, assumeVideo, false);
         } catch (Exception e) {
             LOGGER.error(IT, "Exception occurred fixing URL", e);
             return null;
         }
+    }
+    
+    /**
+     * Check if URI points to a video or audio file based on file extension
+     * @param uri URI to check
+     * @return true if the URI appears to be a video or audio file
+     */
+    private static boolean isVideoOrAudioFile(URI uri) {
+        String path = uri.getPath();
+        LOGGER.debug(IT, "Checking if URI is video/audio: '{}', path: '{}'", uri, path);
+        if (path == null) {
+            LOGGER.debug(IT, "Path is null, returning false");
+            return false;
+        }
+        
+        String lowerPath = path.toLowerCase();
+        LOGGER.debug(IT, "Lowercase path: '{}'", lowerPath);
+        
+        // Check for video file extensions
+        if (lowerPath.endsWith(".mkv") || lowerPath.endsWith(".mp4") || 
+            lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov") || 
+            lowerPath.endsWith(".webm") || lowerPath.endsWith(".flv") ||
+            lowerPath.endsWith(".wmv") || lowerPath.endsWith(".m4v") ||
+            lowerPath.endsWith(".mpg") || lowerPath.endsWith(".mpeg") ||
+            lowerPath.endsWith(".m3u8") || lowerPath.endsWith(".m3u") ||
+            lowerPath.endsWith(".ts") || lowerPath.endsWith(".m2ts") ||
+            lowerPath.endsWith(".3gp") || lowerPath.endsWith(".ogv")) {
+            LOGGER.debug(IT, "Detected as video file");
+            return true;
+        }
+        
+        // Check for audio file extensions
+        boolean isAudio = lowerPath.endsWith(".mp3") || lowerPath.endsWith(".wav") ||
+                lowerPath.endsWith(".ogg") || lowerPath.endsWith(".flac") ||
+                lowerPath.endsWith(".aac") || lowerPath.endsWith(".m4a") ||
+                lowerPath.endsWith(".wma") || lowerPath.endsWith(".opus");
+        
+        if (isAudio) {
+            LOGGER.debug(IT, "Detected as audio file");
+        } else {
+            LOGGER.debug(IT, "Not detected as video or audio file");
+        }
+        
+        return isAudio;
     }
 
     /**
