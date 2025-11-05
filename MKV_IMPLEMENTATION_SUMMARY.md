@@ -9,7 +9,10 @@
 ### 1. 代码修改
 
 #### `src/main/java/org/watermedia/api/image/ImageFetch.java`
-**修改内容**: 添加 MKV MIME 类型到视频类型数组
+**修改内容**: 
+1. 添加 MKV MIME 类型到视频类型数组
+2. 添加文件扩展名检查作为 MIME 类型检测的后备方案
+3. 修复本地视频文件被错误识别为图像的问题
 
 ```java
 // 修改前

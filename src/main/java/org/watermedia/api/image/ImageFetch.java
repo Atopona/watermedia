@@ -107,8 +107,10 @@ public class ImageFetch implements Runnable {
                     } else {
                         // Fallback: check file extension when MIME type is not available (e.g., local files)
                         String path = patchUri.getPath();
+                        LOGGER.debug(IT, "MIME type is null for '{}', checking file extension. Path: '{}'", patchUri, path);
                         if (path != null) {
                             String lowerPath = path.toLowerCase();
+                            LOGGER.debug(IT, "Checking extension for path: '{}'", lowerPath);
                             // Check for video file extensions
                             if (lowerPath.endsWith(".mkv") || lowerPath.endsWith(".mp4") || 
                                 lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov") || 
@@ -117,6 +119,7 @@ public class ImageFetch implements Runnable {
                                 lowerPath.endsWith(".mpg") || lowerPath.endsWith(".mpeg") ||
                                 lowerPath.endsWith(".m3u8") || lowerPath.endsWith(".m3u") ||
                                 lowerPath.endsWith(".ts") || lowerPath.endsWith(".m2ts")) {
+                                LOGGER.debug(IT, "Detected video file by extension: '{}'", lowerPath);
                                 throw new VideoTypeException();
                             }
                             // Check for audio file extensions
@@ -124,15 +127,18 @@ public class ImageFetch implements Runnable {
                                 lowerPath.endsWith(".ogg") || lowerPath.endsWith(".flac") ||
                                 lowerPath.endsWith(".aac") || lowerPath.endsWith(".m4a") ||
                                 lowerPath.endsWith(".wma") || lowerPath.endsWith(".opus")) {
+                                LOGGER.debug(IT, "Detected audio file by extension: '{}'", lowerPath);
                                 throw new VideoTypeException();
                             }
                             // If not a known image extension, throw exception
                             if (!lowerPath.endsWith(".png") && !lowerPath.endsWith(".jpg") && 
                                 !lowerPath.endsWith(".jpeg") && !lowerPath.endsWith(".gif") && 
                                 !lowerPath.endsWith(".bmp") && !lowerPath.endsWith(".webp")) {
+                                LOGGER.debug(IT, "Not a known image extension: '{}'", lowerPath);
                                 throw new NoImageException();
                             }
                         } else {
+                            LOGGER.debug(IT, "Path is null for URI: '{}'", patchUri);
                             throw new NoImageException();
                         }
                     }
