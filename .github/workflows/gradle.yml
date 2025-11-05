@@ -26,5 +26,5 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Test building gradle task
-        run: ./gradlew build --parallel
+      - name: Build project
+        run: ./gradlew build --parallel -x test

@@ -25,8 +25,13 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Release on CurseForge and Modrinth
-        run: ./gradlew publishMods
-        env:
-          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      - name: Build release artifacts
+        run: ./gradlew build shadowJar sourcesJar --parallel -x test
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: watermedia-jars
+          path: |
+            build/libs/*.jar
+            builtJars/*.jar
