@@ -342,6 +342,81 @@ public abstract class BasePlayer {
         raw.mediaPlayer().subpictures().setTrack(trackId);
     }
 
+    /**
+     * Get the number of available subtitle tracks
+     * @return number of subtitle tracks, 0 if none or player not ready
+     */
+    public int getSpuTrackCount() {
+        if (raw == null) return 0;
+        return raw.mediaPlayer().subpictures().trackCount();
+    }
+
+    /**
+     * Enable or disable subtitle display
+     * Note: Due to VLC memory callback rendering mode limitations,
+     * only bitmap-based subtitles (DVD/Blu-ray PGS, VOBSUB) will be rendered.
+     * Text-based subtitles (SRT, ASS, SSA) may not display correctly.
+     * @param enabled true to enable subtitles, false to disable
+     */
+    public void setSpuEnabled(boolean enabled) {
+        if (raw == null) return;
+        if (enabled) {
+            // Enable first available subtitle track
+            List<TrackDescription> tracks = getSpuTracks();
+            if (!tracks.isEmpty() && tracks.size() > 1) {
+                // Track 0 is usually "Disable", so use track 1
+                setSpuTrack(tracks.get(1).id());
+            }
+        } else {
+            // Disable subtitles (track -1 or first track which is usually "Disable")
+            raw.mediaPlayer().subpictures().setTrack(-1);
+        }
+    }
+
+    /**
+     * Add an external subtitle file to the current media
+     * @param subtitleUri URI to the subtitle file (SRT, ASS, etc.)
+     * @return true if subtitle was added successfully
+     */
+    public boolean addSubtitleFile(URI subtitleUri) {
+        if (raw == null) return false;
+        try {
+            // Use media slave API to add subtitle
+            return raw.mediaPlayer().media().addSlave(MediaSlaveType.SUBTITLE, subtitleUri.toString(), true);
+        } catch (Exception e) {
+            LOGGER.error(IT, "Failed to add subtitle file: {}", subtitleUri, e);
+            return false;
+        }
+    }
+
+    /**
+     * Get available audio tracks
+     * @return list of audio track descriptions
+     */
+    public List<TrackDescription> getAudioTracks() {
+        if (raw == null) return Collections.emptyList();
+        return raw.mediaPlayer().audio().trackDescriptions();
+    }
+
+    /**
+     * Get current audio track ID
+     * @return current audio track ID, -1 if not available
+     */
+    public int getAudioTrack() {
+        if (raw == null) return -1;
+        return raw.mediaPlayer().audio().track();
+    }
+
+    /**
+     * Set audio track by ID
+     * @param trackId the track ID to set
+     */
+    public void setAudioTrack(int trackId) {
+        if (raw == null) return;
+        LOGGER.info(IT, "Setting audio track to {}", trackId);
+        raw.mediaPlayer().audio().setTrack(trackId);
+    }
+
     public void release() {
         if (raw == null) return;
         ThreadTool.thread(() -> {

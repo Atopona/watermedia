@@ -10,5 +10,16 @@
 
   "--no-file-logging",
 
-  "--http-reconnect"
+  "--http-reconnect",
+
+  "--video-filter=blend",
+  "--sub-filter=blend",
+  "--freetype-font=Sans",
+  "--freetype-fontsize=24",
+  "--freetype-color=16777215",
+  "--freetype-rel-fontsize=16",
+  "--freetype-background-opacity=128",
+  "--freetype-outline-thickness=2",
+  "--sub-margin=50",
+  "--osd"
 ]
