@@ -2,6 +2,7 @@ package org.watermedia.api.player.videolan;
 
 import org.lwjgl.opengl.GL12;
 import org.watermedia.api.render.RenderAPI;
+import org.watermedia.api.subtitle.SubtitleExtractor;
 import org.watermedia.api.subtitle.SubtitleManager;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.MarkerManager;
@@ -268,6 +269,41 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
      */
     public int autoLoadSubtitles(File videoFile) {
         return subtitleManager.autoLoadSubtitles(videoFile);
+    }
+
+    /**
+     * Extract and load embedded subtitles from the current video
+     * Requires FFmpeg to be installed on the system
+     * @return number of subtitle tracks extracted and loaded
+     */
+    public int extractEmbeddedSubtitles() {
+        return subtitleManager.extractEmbeddedSubtitles(url);
+    }
+
+    /**
+     * Extract and load embedded subtitles from a video file
+     * Requires FFmpeg to be installed on the system
+     * @param videoFile the video file
+     * @return number of subtitle tracks extracted and loaded
+     */
+    public int extractEmbeddedSubtitles(File videoFile) {
+        return subtitleManager.extractEmbeddedSubtitles(videoFile);
+    }
+
+    /**
+     * Check if FFmpeg is available for subtitle extraction
+     */
+    public boolean isFFmpegAvailable() {
+        return SubtitleExtractor.isFFmpegAvailable();
+    }
+
+    /**
+     * Get list of embedded subtitle tracks in the current video
+     * Requires FFprobe to be installed
+     */
+    public java.util.List<SubtitleExtractor.EmbeddedTrack> getEmbeddedSubtitleTracks() {
+        if (url == null) return java.util.Collections.emptyList();
+        return SubtitleExtractor.probeSubtitles(url);
     }
 
     /**

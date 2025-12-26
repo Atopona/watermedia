@@ -286,4 +286,75 @@ public class SubtitleManager {
         }
         return loaded;
     }
+
+    /**
+     * Extract and load embedded subtitles from a video file using FFmpeg
+     * @param videoFile the video file
+     * @return number of subtitle tracks extracted and loaded
+     */
+    public int extractEmbeddedSubtitles(File videoFile) {
+        if (!SubtitleExtractor.isFFmpegAvailable()) {
+            LOGGER.warn(IT, "FFmpeg not available, cannot extract embedded subtitles");
+            return 0;
+        }
+        
+        List<SubtitleTrack> extracted = SubtitleExtractor.extractAllSubtitles(videoFile);
+        for (SubtitleTrack track : extracted) {
+            addTrack(track);
+        }
+        
+        LOGGER.info(IT, "Extracted {} embedded subtitle tracks from {}", extracted.size(), videoFile.getName());
+        return extracted.size();
+    }
+
+    /**
+     * Extract and load embedded subtitles from a video URI using FFmpeg
+     * @param videoUri the video URI
+     * @return number of subtitle tracks extracted and loaded
+     */
+    public int extractEmbeddedSubtitles(java.net.URI videoUri) {
+        if (videoUri == null) return 0;
+        
+        String scheme = videoUri.getScheme();
+        if (scheme != null && scheme.equals("file")) {
+            return extractEmbeddedSubtitles(new File(videoUri.getPath()));
+        }
+        
+        if (!SubtitleExtractor.isFFmpegAvailable()) {
+            LOGGER.warn(IT, "FFmpeg not available, cannot extract embedded subtitles");
+            return 0;
+        }
+        
+        List<SubtitleTrack> extracted = SubtitleExtractor.extractAllSubtitles(videoUri);
+        for (SubtitleTrack track : extracted) {
+            addTrack(track);
+        }
+        
+        LOGGER.info(IT, "Extracted {} embedded subtitle tracks from {}", extracted.size(), videoUri);
+        return extracted.size();
+    }
+
+    /**
+     * Get list of embedded subtitle tracks in a video file (without extracting)
+     * @param videoFile the video file
+     * @return list of embedded tracks
+     */
+    public List<SubtitleExtractor.EmbeddedTrack> probeEmbeddedSubtitles(File videoFile) {
+        return SubtitleExtractor.probeSubtitles(videoFile);
+    }
+
+    /**
+     * Extract a specific embedded subtitle track
+     * @param videoFile the video file
+     * @param track the track to extract
+     * @return true if extracted and loaded successfully
+     */
+    public boolean extractEmbeddedSubtitle(File videoFile, SubtitleExtractor.EmbeddedTrack track) {
+        SubtitleTrack extracted = SubtitleExtractor.extractSubtitle(videoFile, track);
+        if (extracted != null) {
+            addTrack(extracted);
+            return true;
+        }
+        return false;
+    }
 }
