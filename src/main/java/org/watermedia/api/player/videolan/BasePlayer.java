@@ -16,11 +16,12 @@ import org.watermedia.videolan4j.player.base.EmbededMediaPlayerEventListener;
 import org.watermedia.videolan4j.player.base.MediaPlayer;
 import org.watermedia.videolan4j.player.base.State;
 import org.watermedia.videolan4j.player.component.CallbackMediaPlayerComponent;
-import org.watermedia.videolan4j.player.embedded.videosurface.callback.BufferCleanupCallback;
 import org.watermedia.videolan4j.player.embedded.videosurface.callback.BufferFormatCallback;
 import org.watermedia.videolan4j.player.embedded.videosurface.callback.RenderCallback;
 
 import java.net.URI;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -319,8 +320,23 @@ public abstract class BasePlayer {
     }
 
     public void setRepeatMode(boolean repeatMode) {
+        if (raw == null) return;ode);
+    }
+
+    public List<TrackDescription> getSpuTracks() {
+        if (raw == null) return Collections.emptyList();
+        return raw.mediaPlayer().subpictures().trackDescriptions();
+    }
+
+    public int getSpuTrack() {
+        if (raw == null) return -1;
+        return raw.mediaPlayer().subpictures().track();
+    }
+
+    public void setSpuTrack(int trackId) {
         if (raw == null) return;
-        raw.mediaPlayer().controls().setRepeat(repeatMode);
+        LOGGER.info(IT, "Setting SPU track to {}", trackId);
+        raw.mediaPlayer().subpictures().setTrack(trackId);
     }
 
     public void release() {
