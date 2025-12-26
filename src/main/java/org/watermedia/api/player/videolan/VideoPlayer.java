@@ -2,6 +2,7 @@ package org.watermedia.api.player.videolan;
 
 import org.lwjgl.opengl.GL12;
 import org.watermedia.api.render.RenderAPI;
+import org.watermedia.api.subtitle.SubtitleManager;
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.MarkerManager;
 import org.watermedia.videolan4j.factory.MediaPlayerFactory;
@@ -13,6 +14,8 @@ import org.watermedia.videolan4j.player.embedded.videosurface.callback.RenderCal
 import org.watermedia.videolan4j.tools.Chroma;
 
 import java.awt.*;
+import java.io.File;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.InterruptedByTimeoutException;
 import java.util.Objects;
@@ -33,6 +36,9 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
     private final Semaphore semaphore = new Semaphore(1);
     private final Executor renderExecutor;
     private ByteBuffer[] buffers;
+    
+    // Subtitle support
+    private final SubtitleManager subtitleManager;
 
     /**
      * Creates a player instance
@@ -49,6 +55,8 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
         super();
         this.texture = RenderAPI.createTexture();
         this.renderExecutor = Objects.requireNonNull(renderExecutor, "Executor cannot be null");
+        this.subtitleManager = new SubtitleManager();
+        this.subtitleManager.setTimeSupplier(this::getTime);
         this.init(factory, this, this, this);
         if (raw() == null) {
             RenderAPI.deleteTexture(texture);
@@ -152,11 +160,122 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
         return raw().mediaPlayer().video().videoDimension();
     }
 
+    // ==================== SUBTITLE METHODS ====================
+
+    /**
+     * Get the subtitle manager for this player
+     * @return subtitle manager instance
+     */
+    public SubtitleManager getSubtitleManager() {
+        return subtitleManager;
+    }
+
+    /**
+     * Load subtitle from file
+     * @param file subtitle file (SRT, ASS, SSA, VTT)
+     * @return true if loaded successfully
+     */
+    public boolean loadSubtitle(File file) {
+        return subtitleManager.loadSubtitle(file);
+    }
+
+    /**
+     * Load subtitle from URI
+     * @param uri subtitle URI
+     * @return true if loaded successfully
+     */
+    public boolean loadSubtitle(URI uri) {
+        return subtitleManager.loadSubtitle(uri);
+    }
+
+    /**
+     * Load subtitle from string content
+     * @param content subtitle content
+     * @param name track name
+     * @param format format (srt, ass, ssa, vtt)
+     * @return true if loaded successfully
+     */
+    public boolean loadSubtitle(String content, String name, String format) {
+        return subtitleManager.loadSubtitle(content, name, format);
+    }
+
+    /**
+     * Get current subtitle text based on playback time
+     * @return subtitle text or null if no subtitle at current time
+     */
+    public String getCurrentSubtitle() {
+        return subtitleManager.getCurrentText();
+    }
+
+    /**
+     * Get subtitle text at specific time
+     * @param timeMs time in milliseconds
+     * @return subtitle text or null
+     */
+    public String getSubtitleAt(long timeMs) {
+        return subtitleManager.getTextAt(timeMs);
+    }
+
+    /**
+     * Enable or disable subtitle display
+     * @param enabled true to enable
+     */
+    public void setSubtitleEnabled(boolean enabled) {
+        subtitleManager.setEnabled(enabled);
+    }
+
+    /**
+     * Check if subtitles are enabled
+     */
+    public boolean isSubtitleEnabled() {
+        return subtitleManager.isEnabled();
+    }
+
+    /**
+     * Get number of loaded subtitle tracks
+     */
+    public int getSubtitleTrackCount() {
+        return subtitleManager.getTrackCount();
+    }
+
+    /**
+     * Set active subtitle track by index
+     * @param index track index (0-based), -1 to disable
+     */
+    public void setSubtitleTrack(int index) {
+        subtitleManager.setActiveTrack(index);
+    }
+
+    /**
+     * Get active subtitle track index
+     * @return index or -1 if no active track
+     */
+    public int getSubtitleTrack() {
+        return subtitleManager.getActiveTrackIndex();
+    }
+
+    /**
+     * Check if any subtitles are loaded
+     */
+    public boolean hasSubtitles() {
+        return subtitleManager.hasSubtitles();
+    }
+
+    /**
+     * Auto-load subtitles for a video file (looks for .srt, .ass, etc. next to video)
+     * @param videoFile the video file
+     * @return number of subtitles loaded
+     */
+    public int autoLoadSubtitles(File videoFile) {
+        return subtitleManager.autoLoadSubtitles(videoFile);
+    }
+
     /**
      * Releases all resources of the player
      */
     @Override
     public void release() {
+        subtitleManager.clear();
         renderExecutor.execute(() -> RenderAPI.deleteTexture(texture));
         super.release();
     }
