@@ -2,7 +2,6 @@ package org.watermedia.api.subtitle;
 
 import org.apache.logging.log4j.Marker;
 import org.apache.logging.log4j.MarkerManager;
-import org.watermedia.api.WaterMediaAPI;
 import org.watermedia.api.subtitle.parsers.AssParser;
 import org.watermedia.api.subtitle.parsers.SrtParser;
 import org.watermedia.api.subtitle.parsers.VttParser;
@@ -22,9 +21,11 @@ import static org.watermedia.WaterMedia.LOGGER;
  * API for parsing and managing subtitles
  * Supports SRT, ASS, SSA, and WebVTT formats
  */
-public class SubtitleAPI extends WaterMediaAPI {
+public final class SubtitleAPI {
     
     private static final Marker IT = MarkerManager.getMarker("SubtitleAPI");
+    
+    private SubtitleAPI() {} // Utility class, no instantiation
 
     /**
      * Parse subtitle from file path
