@@ -18,6 +18,8 @@ import org.watermedia.videolan4j.player.base.State;
 import org.watermedia.videolan4j.player.component.CallbackMediaPlayerComponent;
 import org.watermedia.videolan4j.player.embedded.videosurface.callback.BufferFormatCallback;
 import org.watermedia.videolan4j.player.embedded.videosurface.callback.RenderCallback;
+import org.watermedia.videolan4j.player.embedded.videosurface.callback.BufferCleanupCallback;
+import org.watermedia.videolan4j.player.base.TrackDescription;
 
 import java.net.URI;
 import java.util.Collections;
