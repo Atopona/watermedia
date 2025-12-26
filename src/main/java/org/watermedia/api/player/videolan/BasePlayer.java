@@ -320,7 +320,8 @@ public abstract class BasePlayer {
     }
 
     public void setRepeatMode(boolean repeatMode) {
-        if (raw == null) return;ode);
+        if (raw == null) return;
+        raw.mediaPlayer().controls().setRepeat(repeatMode);
     }
 
     public List<TrackDescription> getSpuTracks() {
