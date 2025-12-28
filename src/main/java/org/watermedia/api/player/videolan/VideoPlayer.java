@@ -13,34 +13,17 @@ import org.watermedia.videolan4j.player.embedded.videosurface.callback.RenderCal
 import org.watermedia.videolan4j.tools.Chroma;
 
 import java.awt.*;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.channels.InterruptedByTimeoutException;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 import static org.watermedia.WaterMedia.LOGGER;
 
 public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFormatCallback, BufferCleanupCallback {
     private static final Marker IT = MarkerManager.getMarker("VideoPlayer");
-    
-    /** HDR 模式常量 */
-    public static final int HDR_MODE_SDR = 0;
-    public static final int HDR_MODE_PQ = 1;   // HDR10 (PQ/SMPTE ST 2084)
-    public static final int HDR_MODE_HLG = 2;  // HLG (Hybrid Log-Gamma)
-    
-    /** HDR 文件名检测模式 */
-    private static final Pattern HDR10_PATTERN = Pattern.compile(
-        "(?i)(hdr10|hdr\\.10|2160p.*hdr|4k.*hdr|uhd.*hdr|dv|dolby.?vision|pq)",
-        Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern HLG_PATTERN = Pattern.compile(
-        "(?i)(hlg|hybrid.?log)",
-        Pattern.CASE_INSENSITIVE
-    );
 
     private int width = 1;
     private int height = 1;
@@ -50,11 +33,6 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
     private final Semaphore semaphore = new Semaphore(1);
     private final Executor renderExecutor;
     private ByteBuffer[] buffers;
-    
-    /** HDR 模式：0=SDR, 1=PQ(HDR10), 2=HLG */
-    private int hdrMode = HDR_MODE_SDR;
-    /** 是否自动检测 HDR */
-    private boolean autoDetectHdr = true;
 
     /**
      * Creates a player instance
@@ -172,82 +150,6 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
     public Dimension dimension() {
         if (raw() == null) return null;
         return raw().mediaPlayer().video().videoDimension();
-    }
-    
-    /**
-     * 获取当前 HDR 模式
-     * @return HDR_MODE_SDR, HDR_MODE_PQ, 或 HDR_MODE_HLG
-     */
-    public int getHdrMode() {
-        return hdrMode;
-    }
-    
-    /**
-     * 手动设置 HDR 模式
-     * @param mode HDR_MODE_SDR, HDR_MODE_PQ, 或 HDR_MODE_HLG
-     */
-    public void setHdrMode(int mode) {
-        this.hdrMode = mode;
-        this.autoDetectHdr = false;
-    }
-    
-    /**
-     * 启用 HDR 自动检测（基于文件名）
-     */
-    public void enableAutoHdrDetection() {
-        this.autoDetectHdr = true;
-    }
-    
-    /**
-     * 检查是否为 HDR 内容
-     * @return true 如果当前内容是 HDR
-     */
-    public boolean isHdr() {
-        return hdrMode != HDR_MODE_SDR;
-    }
-    
-    /**
-     * 根据 URI 自动检测 HDR 模式
-     * @param uri 媒体 URI
-     */
-    protected void detectHdrMode(URI uri) {
-        if (!autoDetectHdr || uri == null) return;
-        
-        String path = uri.toString().toLowerCase();
-        
-        if (HLG_PATTERN.matcher(path).find()) {
-            this.hdrMode = HDR_MODE_HLG;
-            LOGGER.info(IT, "Detected HLG HDR content: {}", uri);
-        } else if (HDR10_PATTERN.matcher(path).find()) {
-            this.hdrMode = HDR_MODE_PQ;
-            LOGGER.info(IT, "Detected HDR10 (PQ) content: {}", uri);
-        } else {
-            this.hdrMode = HDR_MODE_SDR;
-        }
-    }
-    
-    @Override
-    public void start(URI url) {
-        detectHdrMode(url);
-        super.start(url);
-    }
-    
-    @Override
-    public void start(URI url, String[] vlcArgs) {
-        detectHdrMode(url);
-        super.start(url, vlcArgs);
-    }
-    
-    @Override
-    public void startPaused(URI url) {
-        detectHdrMode(url);
-        super.startPaused(url);
-    }
-    
-    @Override
-    public void startPaused(URI url, String[] vlcArgs) {
-        detectHdrMode(url);
-        super.startPaused(url, vlcArgs);
     }
 
     /**
