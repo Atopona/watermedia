@@ -24,30 +24,103 @@ import static org.watermedia.WaterMedia.LOGGER;
 public class ImageAPI extends WaterMediaAPI {
     public static final Marker IT = MarkerManager.getMarker(ImageAPI.class.getSimpleName());
 
-    // IMAGE STORAGE
+    // IMAGE STORAGE - Using volatile for thread-safe lazy initialization
     private static final Map<String, ImageRenderer> LOADING_CACHE = new HashMap<>();
-    private static ImageRenderer IMG_LOADING;
-    private static ImageRenderer IMG_VLC_FAIL;
-    private static ImageRenderer IMG_VLC_FAIL_LAND;
-    private static ImageRenderer IMG_BLACK;
+    private static volatile ImageRenderer IMG_LOADING;
+    private static volatile ImageRenderer IMG_VLC_FAIL;
+    private static volatile ImageRenderer IMG_VLC_FAIL_LAND;
+    private static volatile ImageRenderer IMG_BLACK;
 
-    private static ImageCache IMG_CACHE_LOADING;
-    private static ImageCache IMG_CACHE_VLC_FAIL;
-    private static ImageCache IMG_CACHE_VLC_FAIL_LAND;
+    private static volatile ImageCache IMG_CACHE_LOADING;
+    private static volatile ImageCache IMG_CACHE_VLC_FAIL;
+    private static volatile ImageCache IMG_CACHE_VLC_FAIL_LAND;
+    
+    // Lock objects for lazy initialization
+    private static final Object LOADING_LOCK = new Object();
+    private static final Object VLC_FAIL_LOCK = new Object();
+    private static final Object VLC_FAIL_LAND_LOCK = new Object();
+    private static final Object BLACK_LOCK = new Object();
 
-    // VLC
-    public static ImageRenderer failedVLC() { return IMG_VLC_FAIL; }
-    public static ImageRenderer failedVLCLandscape() { return IMG_VLC_FAIL_LAND; }
+    // VLC - Lazy loaded
+    public static ImageRenderer failedVLC() {
+        ImageRenderer result = IMG_VLC_FAIL;
+        if (result == null) {
+            synchronized (VLC_FAIL_LOCK) {
+                result = IMG_VLC_FAIL;
+                if (result == null) {
+                    IMG_VLC_FAIL = result = renderer(JarTool.readGif("/pictures/videolan/failed.gif"), true);
+                    IMG_CACHE_VLC_FAIL = createCache(result);
+                }
+            }
+        }
+        return result;
+    }
+    
+    public static ImageRenderer failedVLCLandscape() {
+        ImageRenderer result = IMG_VLC_FAIL_LAND;
+        if (result == null) {
+            synchronized (VLC_FAIL_LAND_LOCK) {
+                result = IMG_VLC_FAIL_LAND;
+                if (result == null) {
+                    IMG_VLC_FAIL_LAND = result = renderer(JarTool.readGif("/pictures/videolan/failed-land.gif"), true);
+                    IMG_CACHE_VLC_FAIL_LAND = createCache(result);
+                }
+            }
+        }
+        return result;
+    }
 
-    // VLC
-    public static ImageCache cacheFailedVLC() { return IMG_CACHE_VLC_FAIL; }
-    public static ImageCache cacheFailedVLCLandscape() { return IMG_CACHE_VLC_FAIL_LAND; }
+    // VLC Cache - Lazy loaded
+    public static ImageCache cacheFailedVLC() {
+        failedVLC(); // Ensure initialized
+        return IMG_CACHE_VLC_FAIL;
+    }
+    
+    public static ImageCache cacheFailedVLCLandscape() {
+        failedVLCLandscape(); // Ensure initialized
+        return IMG_CACHE_VLC_FAIL_LAND;
+    }
 
-    // LOADING GIFs
-    public static ImageRenderer loadingGif() { return IMG_LOADING; }
-    public static ImageRenderer blackPicture() { return IMG_BLACK; }
+    // LOADING GIFs - Lazy loaded
+    public static ImageRenderer loadingGif() {
+        ImageRenderer result = IMG_LOADING;
+        if (result == null) {
+            synchronized (LOADING_LOCK) {
+                result = IMG_LOADING;
+                if (result == null) {
+                    Path processDir = WaterMedia.getLoader().processDir();
+                    Path loadingGifPath = processDir.resolve("config/watermedia/assets/loading.gif");
+                    if (loadingGifPath.toFile().exists()) {
+                        IMG_LOADING = result = renderer(IOTool.readGif(loadingGifPath), true);
+                    } else {
+                        IMG_LOADING = result = renderer(JarTool.readGif("/pictures/loading.gif"), true);
+                    }
+                    IMG_CACHE_LOADING = createCache(result);
+                }
+            }
+        }
+        return result;
+    }
+    
+    public static ImageRenderer blackPicture() {
+        ImageRenderer result = IMG_BLACK;
+        if (result == null) {
+            synchronized (BLACK_LOCK) {
+                result = IMG_BLACK;
+                if (result == null) {
+                    BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+                    image.setRGB(0, 0, MathAPI.argb(255, 0, 0, 0));
+                    IMG_BLACK = result = renderer(image);
+                }
+            }
+        }
+        return result;
+    }
 
-    public static ImageCache cacheLoadingGif() { return IMG_CACHE_LOADING; }
+    public static ImageCache cacheLoadingGif() {
+        loadingGif(); // Ensure initialized
+        return IMG_CACHE_LOADING;
+    }
 
     /**
      * Search for a custom loading gif for a mod, using mod id for unique storage.<br><br>
@@ -229,9 +302,10 @@ public class ImageAPI extends WaterMediaAPI {
 
     @Override
     public boolean prepare(ILoader bootCore) throws Exception {
+        // Just check for custom loading gif path - actual loading is lazy
         this.loadingGifPath = bootCore.processDir().resolve("config/watermedia/assets/loading.gif");
         if (loadingGifPath.toFile().exists()) {
-            LOGGER.info(IT, "Detected custom loading gif... overriding default one");
+            LOGGER.info(IT, "Detected custom loading gif... will be loaded on first use");
         } else {
             this.loadingGifPath = null;
         }
@@ -240,35 +314,33 @@ public class ImageAPI extends WaterMediaAPI {
 
     @Override
     public void start(ILoader bootCore) throws Exception {
-        if (IMG_LOADING != null) {
-            // TODO: release images and try again
-        }
-
-        LOGGER.info(IT, "Loading image resources in a {} instance", ImageRenderer.class.getSimpleName());
-
-        IMG_LOADING = renderer(loadingGifPath != null ? IOTool.readGif(loadingGifPath) : JarTool.readGif("/pictures/loading.gif"), true);
-        IMG_VLC_FAIL = renderer(JarTool.readGif("/pictures/videolan/failed.gif"), true);
-        IMG_VLC_FAIL_LAND = renderer(JarTool.readGif("/pictures/videolan/failed-land.gif"), true);
-
-        IMG_CACHE_LOADING = createCache(IMG_LOADING);
-        IMG_CACHE_VLC_FAIL = createCache(IMG_VLC_FAIL);
-        IMG_CACHE_VLC_FAIL_LAND = createCache(IMG_VLC_FAIL_LAND);
-
-        BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
-        image.setRGB(0, 0, MathAPI.argb(255, 0, 0, 0));
-        IMG_BLACK = renderer(image);
-
+        // Images are now lazy-loaded on first access
+        // This significantly improves startup time
+        LOGGER.info(IT, "ImageAPI initialized with lazy loading enabled");
     }
 
     @Override
     public void release() {
-        IMG_LOADING.release();
-        IMG_VLC_FAIL.release();
-        IMG_VLC_FAIL_LAND.release();
-        IMG_BLACK.release();
-        IMG_LOADING = null;
-        IMG_VLC_FAIL = null;
-        IMG_VLC_FAIL_LAND = null;
-        IMG_BLACK = null;
+        // Release only if initialized
+        if (IMG_LOADING != null) {
+            IMG_LOADING.release();
+            IMG_LOADING = null;
+        }
+        if (IMG_VLC_FAIL != null) {
+            IMG_VLC_FAIL.release();
+            IMG_VLC_FAIL = null;
+        }
+        if (IMG_VLC_FAIL_LAND != null) {
+            IMG_VLC_FAIL_LAND.release();
+            IMG_VLC_FAIL_LAND = null;
+        }
+        if (IMG_BLACK != null) {
+            IMG_BLACK.release();
+            IMG_BLACK = null;
+        }
+        
+        IMG_CACHE_LOADING = null;
+        IMG_CACHE_VLC_FAIL = null;
+        IMG_CACHE_VLC_FAIL_LAND = null;
     }
 }

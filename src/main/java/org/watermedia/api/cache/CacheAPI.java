@@ -13,8 +13,9 @@ import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.StampedLock;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -23,7 +24,16 @@ import static org.watermedia.WaterMedia.LOGGER;
 @SuppressWarnings({"unused"})
 public class CacheAPI extends WaterInternalAPI {
     private static final Marker IT = MarkerManager.getMarker(CacheAPI.class.getSimpleName());
-    private static final Map<URI, Entry> ENTRIES = new HashMap<>();
+    
+    /**
+     * Thread-safe cache using ConcurrentHashMap for better concurrent access.
+     */
+    private static final Map<URI, Entry> ENTRIES = new ConcurrentHashMap<>();
+    
+    /**
+     * StampedLock for index file operations - allows optimistic reads.
+     */
+    private static final StampedLock INDEX_LOCK = new StampedLock();
 
     private static File dir;
     private static File index;
@@ -57,44 +67,42 @@ public class CacheAPI extends WaterInternalAPI {
     }
 
     public static void saveFile(URI url, String tag, long time, long expireTime, byte[] data) {
-        synchronized (ENTRIES) {
-            Entry entry = new Entry(url, tag, time, expireTime);
-            boolean saved = false;
-            File file = entry$getFile(entry.uri);
+        Entry entry = new Entry(url, tag, time, expireTime);
+        boolean saved = false;
+        File file = entry$getFile(entry.uri);
 
-            try (OutputStream out = Files.newOutputStream(file.toPath())) {
-                out.write(data);
-                saved = true;
-            } catch (Exception e) { LOGGER.error(IT, "Failed to save cache file {}", url, e); }
+        try (OutputStream out = Files.newOutputStream(file.toPath())) {
+            out.write(data);
+            saved = true;
+        } catch (Exception e) { LOGGER.error(IT, "Failed to save cache file {}", url, e); }
 
-            // SAVE INDEX FIST
-            if (saved && refreshAll()) {
-                ENTRIES.put(url, entry);
-            } else if (file.exists()) {
-                if (file.delete()) LOGGER.warn(IT, "Cannot delete unsaved entry file of '{}' located in '{}'", url, file.toString());
+        if (saved) {
+            ENTRIES.put(url, entry);
+            // Use write lock only for index refresh
+            long stamp = INDEX_LOCK.writeLock();
+            try {
+                refreshAll();
+            } finally {
+                INDEX_LOCK.unlockWrite(stamp);
             }
+        } else if (file.exists()) {
+            if (!file.delete()) LOGGER.warn(IT, "Cannot delete unsaved entry file of '{}' located in '{}'", url, file.toString());
         }
     }
 
     public static Entry getEntry(URI url) {
-        synchronized (ENTRIES) {
-            return ENTRIES.get(url);
-        }
+        return ENTRIES.get(url);
     }
 
     public static void updateEntry(Entry fresh) {
-        synchronized (ENTRIES) {
-            ENTRIES.put(fresh.uri, fresh);
-        }
+        ENTRIES.put(fresh.uri, fresh);
     }
 
     public static void deleteEntry(URI url) {
-        synchronized (ENTRIES) {
-            ENTRIES.remove(url);
-            File file = entry$getFile(url);
-            if (file.exists()) {
-                if (file.delete()) LOGGER.warn(IT, "Cannot delete entry file of '{}' located in '{}'", url, file.toString());
-            }
+        ENTRIES.remove(url);
+        File file = entry$getFile(url);
+        if (file.exists()) {
+            if (!file.delete()) LOGGER.warn(IT, "Cannot delete entry file of '{}' located in '{}'", url, file.toString());
         }
     }
 

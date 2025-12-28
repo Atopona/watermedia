@@ -2,7 +2,8 @@ package org.watermedia.api.image;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -12,7 +13,27 @@ import java.util.function.Consumer;
 import static org.watermedia.WaterMedia.LOGGER;
 
 public class ImageCache {
-    static final Map<URI, ImageCache> CACHE = new HashMap<>();
+    private static final int MAX_CACHE_SIZE = 256;
+    
+    /**
+     * LRU cache with automatic eviction when size exceeds MAX_CACHE_SIZE.
+     * Uses access-order LinkedHashMap for LRU behavior.
+     */
+    static final Map<URI, ImageCache> CACHE = Collections.synchronizedMap(
+        new LinkedHashMap<URI, ImageCache>(128, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<URI, ImageCache> eldest) {
+                if (size() > MAX_CACHE_SIZE) {
+                    ImageCache cache = eldest.getValue();
+                    if (cache != null && cache.uses.get() <= 0) {
+                        cache.release();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+    );
 
     /**
      * @nullable

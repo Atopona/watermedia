@@ -77,7 +77,7 @@ public class RenderAPI extends WaterMediaAPI {
     }
 
     /**
-     * Converts the BufferedImage into a different format
+     * Converts the BufferedImage into a different format using hardware-accelerated rendering.
      *
      * @param originalImage original image in any other format
      * @return converted image to ARGB format
@@ -86,11 +86,14 @@ public class RenderAPI extends WaterMediaAPI {
         // If image type is already good then no conversion needed, so we use the original image.
         if(originalImage.getType() == BufferedImage.TYPE_INT_ARGB) return originalImage;
 
-        // Convert the image to the expected format.
+        // Convert the image to the expected format using hardware acceleration hints
         BufferedImage newImage = new BufferedImage(originalImage.getWidth(), originalImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics g = newImage.getGraphics();
-        g.drawImage(originalImage, 0, 0, null);
-        g.dispose();
+        Graphics2D g2d = newImage.createGraphics();
+        // Use speed-optimized rendering for better performance
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g2d.drawImage(originalImage, 0, 0, null);
+        g2d.dispose();
         return newImage;
     }
 

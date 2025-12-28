@@ -14,25 +14,44 @@ import org.watermedia.videolan4j.tools.Chroma;
 
 import java.awt.*;
 import java.nio.ByteBuffer;
-import java.nio.channels.InterruptedByTimeoutException;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.watermedia.WaterMedia.LOGGER;
 
 public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFormatCallback, BufferCleanupCallback {
     private static final Marker IT = MarkerManager.getMarker("VideoPlayer");
+    
+    /**
+     * Timeout for semaphore acquisition in milliseconds.
+     * Reduced from 1000ms to 100ms for faster failure detection.
+     */
+    private static final long SEMAPHORE_TIMEOUT_MS = 100;
 
     private int width = 1;
     private int height = 1;
     private int size = width * height * 4;
-    private boolean first = true;
+    private volatile boolean first = true;
     private final int texture;
     private final Semaphore semaphore = new Semaphore(1);
     private final Executor renderExecutor;
-    private ByteBuffer[] buffers;
+    private volatile ByteBuffer[] buffers;
+    
+    /**
+     * Flag to indicate a new frame is ready for upload.
+     * Uses AtomicBoolean for lock-free synchronization.
+     */
+    private final AtomicBoolean frameReady = new AtomicBoolean(false);
+    
+    /**
+     * Counter for consecutive timeout failures.
+     * Used to detect persistent synchronization issues.
+     */
+    private volatile int timeoutCount = 0;
+    private static final int MAX_TIMEOUT_COUNT = 5;
 
     /**
      * Creates a player instance
@@ -60,24 +79,42 @@ public class VideoPlayer extends BasePlayer implements RenderCallback, BufferFor
 
     @Override
     public void display(MediaPlayer mediaPlayer, ByteBuffer[] nativeBuffers, BufferFormat bufferFormat) {
+        // Mark frame as ready - actual upload happens on render thread
+        frameReady.set(true);
+        
         renderExecutor.execute(() -> {
+            if (!frameReady.compareAndSet(true, false)) {
+                return; // Frame already processed or no new frame
+            }
+            
             RenderAPI.bindTexture(this.texture);
             try {
-                if (semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
-                    if (buffers != null && buffers.length > 0) {
-                        RenderAPI.uploadBuffer(buffers[0], texture, GL12.GL_RGBA, width, height, first);
-                        first = false;
+                if (semaphore.tryAcquire(SEMAPHORE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    try {
+                        if (buffers != null && buffers.length > 0 && buffers[0] != null) {
+                            RenderAPI.uploadBuffer(buffers[0], texture, GL12.GL_RGBA, width, height, first);
+                            first = false;
+                            timeoutCount = 0; // Reset timeout counter on success
+                        }
+                    } finally {
+                        semaphore.release();
                     }
-                    semaphore.release();
                 } else {
-                    LOGGER.error(IT, "{} took more than 1 second to synchronize with native threads", this, new InterruptedByTimeoutException());
-                    if (first) { // first frames means no texture, this might cause serious problems
-                        throw new IllegalStateException("Cannot handle interruption");
+                    timeoutCount++;
+                    if (timeoutCount >= MAX_TIMEOUT_COUNT) {
+                        LOGGER.error(IT, "{} exceeded max timeout count ({}), releasing player", this, MAX_TIMEOUT_COUNT);
+                        if (first) {
+                            // First frames means no texture, this might cause serious problems
+                            throw new IllegalStateException("Cannot handle persistent synchronization failure");
+                        }
+                        this.release();
+                    } else {
+                        LOGGER.warn(IT, "{} timeout acquiring semaphore ({}/{})", this, timeoutCount, MAX_TIMEOUT_COUNT);
                     }
-                    this.release();
                 }
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                Thread.currentThread().interrupt();
+                LOGGER.error(IT, "Interrupted while waiting for semaphore", e);
             }
         });
     }

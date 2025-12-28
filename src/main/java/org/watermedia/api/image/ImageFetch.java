@@ -26,8 +26,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -37,7 +36,20 @@ import static org.watermedia.api.image.ImageAPI.IT;
 
 public class ImageFetch implements Runnable {
     private static final DateFormat FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z");
-    private static final ExecutorService EX = Executors.newScheduledThreadPool(ThreadTool.minThreads(), ThreadTool.factory("ImageFetch-Worker", Thread.NORM_PRIORITY + 1));
+    
+    /**
+     * Bounded thread pool with rejection policy to prevent task accumulation.
+     * Uses CallerRunsPolicy to apply backpressure when queue is full.
+     */
+    private static final ExecutorService EX = new ThreadPoolExecutor(
+        ThreadTool.minThreads(),
+        Math.max(ThreadTool.minThreads() * 2, 4),
+        60L, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(100),
+        ThreadTool.factory("ImageFetch-Worker", Thread.NORM_PRIORITY + 1),
+        new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+    
     private static final String[] VID_MIMETYPES = new String[] { "video", "audio", "application/vnd.apple.mpegurl", "application/x-mpegurl", "video/x-matroska" };
 
     public final URI uri;

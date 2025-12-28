@@ -19,16 +19,24 @@ public class NetworkAPI extends WaterMediaAPI {
     public static final Marker IT = MarkerManager.getMarker("NetworkAPI");
     private static final List<AbstractPatch> FIXERS = new ArrayList<>();
 
+    /**
+     * TTL constants for different content types.
+     * Streams need shorter TTL as URLs may expire, static content can be cached longer.
+     */
+    private static final long STREAM_TTL_MS = 30_000;      // 30 seconds for streams
+    private static final long STATIC_TTL_MS = 300_000;     // 5 minutes for static content
+    private static final int MAX_PATCH_CACHE_SIZE = 512;
+    
     private static final Map<URI, AbstractPatch.Result> CACHE = new ConcurrentHashMap<URI, AbstractPatch.Result>() {
-        private final HashMap<AbstractPatch.Result, Long> EXPIRES_IN = new HashMap<>();
+        private final ConcurrentHashMap<AbstractPatch.Result, Long> EXPIRES_IN = new ConcurrentHashMap<>();
 
         @Override
         public AbstractPatch.Result get(Object key) {
             AbstractPatch.Result patch = super.get(key);
 
             if (patch != null) {
-                long expires = EXPIRES_IN.get(patch);
-                if (System.currentTimeMillis() > expires) {
+                Long expires = EXPIRES_IN.get(patch);
+                if (expires == null || System.currentTimeMillis() > expires) {
                     EXPIRES_IN.remove(patch);
                     this.remove(key);
                     LOGGER.debug("Cache patch for '{}' has expired", key);
@@ -43,10 +51,25 @@ public class NetworkAPI extends WaterMediaAPI {
 
         @Override
         public AbstractPatch.Result put(URI key, AbstractPatch.Result value) {
+            // Evict oldest entries if cache is too large
+            if (size() > MAX_PATCH_CACHE_SIZE) {
+                Iterator<URI> it = keySet().iterator();
+                int toRemove = size() / 4; // Remove 25% of entries
+                while (it.hasNext() && toRemove > 0) {
+                    URI k = it.next();
+                    AbstractPatch.Result v = super.get(k);
+                    if (v != null) EXPIRES_IN.remove(v);
+                    it.remove();
+                    toRemove--;
+                }
+            }
+            
             try {
                 return super.put(key, value);
             } finally {
-                EXPIRES_IN.put(value, System.currentTimeMillis() + 10000);
+                // Dynamic TTL based on content type
+                long ttl = (value.assumeStream || value.assumeVideo) ? STREAM_TTL_MS : STATIC_TTL_MS;
+                EXPIRES_IN.put(value, System.currentTimeMillis() + ttl);
             }
         }
     };

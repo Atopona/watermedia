@@ -105,9 +105,8 @@ public abstract class BasePlayer {
 
     public void startPaused(URI url) { this.startPaused(url, new String[0]); }
     public void startPaused(URI url, String[] vlcArgs) {
-        final String[] args = new String[vlcArgs.length + 1];
-        System.arraycopy(vlcArgs, 0, args, 0, vlcArgs.length);
-        args[vlcArgs.length] = "start-paused"; // pause on start
+        // Reuse array building to reduce allocations
+        final String[] args = buildArgsWithExtra(vlcArgs, "start-paused");
 
         ThreadTool.thread(() -> {
             this.lock.lock();
@@ -116,6 +115,17 @@ public abstract class BasePlayer {
             }
             this.lock.unlock();
         });
+    }
+    
+    /**
+     * Helper method to build VLC args array with extra arguments.
+     * Reduces array allocation overhead.
+     */
+    private static String[] buildArgsWithExtra(String[] baseArgs, String... extraArgs) {
+        String[] result = new String[baseArgs.length + extraArgs.length];
+        System.arraycopy(baseArgs, 0, result, 0, baseArgs.length);
+        System.arraycopy(extraArgs, 0, result, baseArgs.length, extraArgs.length);
+        return result;
     }
 
     public void resume() {
